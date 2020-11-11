@@ -1,0 +1,289 @@
+<!--- Begin styling code. --->
+<style type="text/css">
+/* Whole document: */
+body{
+  font-family: "Palatino Linotype", "Book Antiqua", Palatino, serif;
+  font-size: 12pt;
+}
+h1.title {
+  font-size: 38px;
+  text-align: center;
+}
+h4.author {
+  font-size: 18px;
+  text-align: center;
+}
+h4.date {
+  font-size: 18px;
+  text-align: center;
+}
+</style>
+<!--- End styling code. --->
+
+---
+title: "Analyzing Complexity of Board Games"
+author: "Wuwei Zhang"
+date: "Due: 10/26/2020"
+output: html_document
+---
+## Inroduction
+In this report, the data set is from [BoardGameGeek website](https://www.boardgamegeek.com/). I used this data set to mainly focus on analyzing the complexity of board games interacting with the other elements of board games. The average complexity of each game is determined by users, who rate games' complexity on a 1 to 5 scale. And the average rating of each game is also determined by users, who rate games on a 1 to 10 scale. To consider only board games with fairly reliable and meaningful ratings and impact on today, I restricted the data set to just those games with at least 25 ratings, published in 1950 or later, and average complexity larger than 0.
+
+```{r, include = FALSE}
+# Load packages
+library(tidyverse)
+library(splitstackshape)
+# Read the data file in Data subfolder.
+data_set <- read_csv("./Data/board_game_raw.csv") %>%
+  # Restrict the data set to only include the games with at least 25 ratings,
+  # published in 1950 or later, and average complexity larger than 0.
+  filter(yearpublished >= 1950, users_rated >= 25, average_complexity >0)
+```
+
+### Complexity of Board Games from 1950 to Now
+
+I first took a look at the general pattern of the average complexity of all such board games.
+
+Here is my first visualization.
+
+```{r, echo = FALSE, fig.cap = "Figure 1: Histogram of the BoardGameGeek ratings of complexity of all board games with at least 25 ratings, published in 1950 or later, and average complexity larger than 0. This histogram displays the count of average complexity scores for these games."}
+# Generate a histogram of average complexity of the games
+ggplot(data = data_set, aes(x = average_complexity)) +
+  # Adjust the histogram's bin width and color.
+  geom_histogram(binwidth = 0.2, color = "black", fill = "lightblue") +
+  theme_bw() +
+  # Change plot's title, x-axis and y-axis titles.
+  labs(title = "Average Complexity of Board Games (1950-now)", 
+       x = "Average Complexity", y = "Count")
+```
+
+This histogram is right-skewed. It shows that most of the board games have complexity falling in 1 to 3 and only a small number of board games have complexity 4 or 5. And 2 is the mode of complexity of all these board games. Therefore, most board games from 1950 to now are having medium or lower complexity and not so difficult for most people to play.
+
+### Complexity and Year of Publication
+
+However, does this pattern always maintain the same? Or whether there would be some differences in complexity of the board games in different periods?
+To solve this question, I made a scatterplot of games’ average complexity by the year of publication with a fitting curve.
+
+```{r, echo = FALSE, message = FALSE, fig.cap = "Figure 2: Scatterplot of games’ average complexity by the year of publication. This scatterplot including a fitting curve displays the trend of complexity scores from 1950 to now."}
+# Generate a scatterplot of games’ average complexity by the year of 
+# publication with a fitting curve.
+ggplot(data = data_set, aes(x = yearpublished, y = average_complexity)) +
+  geom_point(size = 0.75) +
+  # Generate a fitting curve.
+  geom_smooth() +
+  theme_bw() +
+  # Change plot's title, x-axis and y-axis titles.
+  labs(title = "Average Complexity for Games by Year of Publication", 
+       x = "Year of Publication", y = "Average Complexity") +
+  # Adjust x-axis label.
+  scale_x_continuous(breaks = seq(1950, 2020, 10))
+```
+
+By the fitting curve, I found that the board games before 1970 have relatively low complexity comparing to the board games of other periods. Before 1980, the average complexity tends to increase and reach the highest at around 1980. So, the board games published in around 1980 overall would be the most complex for players. And from 1970 to now, the average complexity of the board games published in a certain year slightly floats between 2 to 2.5 and is maintained in this interval. Therefore, the average complexity from around 1970 to now doesn't change much.
+
+### Complexity and Rating
+
+In common sense, people usually don’t like things that are too difficult to enjoy themselves. To find out the relationship between complexity of the board games and how much people like them, I made a scatterplot of games’ average ratings by their average complexity with a fitting curve.
+
+```{r, echo = FALSE, message = FALSE, fig.cap = "Figure 3: Scatterplot of games’ average ratings by their average complexity scores. This scatterplot including a fitting curve displays the trend of players' rating with average complexity increasing from 1 to 5."}
+# Generate a scatterplot of games’ average ratings by their average complexity 
+# with a fitting curve.
+ggplot(data = data_set, aes(x = average_complexity, y = average_rating)) +
+  geom_point(size = 0.5) +
+  # Generate a fitting curve
+  geom_smooth() +
+  theme_bw() +
+  # Change plot's title, x-axis and y-axis titles.
+  labs(title = "Average User Ratings by Average Complexity", 
+       x = "Average Complexity", y = "Average Rating")
+```
+
+By the fitting curve, it is really counterintuitive and surprising that people's ratings tend to increase as the complexity increases and maintain almost the same between complexity 4 to 5. And the board games that have the lowest average complexity 1 also get the lowest overall ratings. Complexity around 4 would be the best because the average rating is about the highest around this point. Therefore, players may don't like the games that are so easy to play. Comparing to the average complexity of about 2 to 2.5 of all board games after 1970 discussed in last visualization, players may now like and expect more games that could be a little more challenging.
+
+### Complexity and the Number of Minimum Players
+
+Another guess of mine is that more people needed to start with would make the game more complex. In order to figure out whether players would think the games become complex with increased number of minimum players required, I made the line plot of games’ average complexity by number of minimum players below.
+
+```{r, echo = FALSE, message = FALSE, fig.cap = "Figure 4: Line plot of games’ average complexity by number of minimum players. This line plot displays the trend of average complexity scores with the number of minimum players increasing from 0 to 10."}
+# Make a new variable that converts the numeric variable minplayers to 
+# character.
+sum_data <- mutate(data_set, min_players = as.character(minplayers)) %>%
+  # Group the data set by new variable min_players.
+  group_by(min_players) %>%
+  # Calculate the mean of average complexity of the games with different
+  # minimum players required.
+  summarize(mean_complexity = mean(average_complexity))
+# Convert the variable min_players back to be numeric.
+sum_data$min_players <- as.numeric(sum_data$min_players)
+  # Generate a line plot of games’ average complexity by number of minimum 
+  # players.
+  ggplot(data = sum_data, aes(x = min_players, y = mean_complexity)) +
+  geom_line(size = 0.75) +
+  geom_point() +
+  theme_bw() +
+  # Set the y-axis be 0 to 3.
+  ylim(0,3) +
+  # Change plot's title, x-axis and y-axis titles.
+  labs(title = "Average Complexity of Board Games by Number of Minimum Players", 
+       x = "Number of Minplayers", y = "Average Complexity") +
+  # Adjust the title of the plot.
+  theme(plot.title = element_text(size = 11, face = "bold")) +
+  # Adjust the scale of x-axis.
+  scale_x_continuous(breaks = seq(0, 10, 1))
+```
+
+This visualization is also kind of counterintuitive for me. When the number of minimum players increases from 0 to 4, the average rated complexity tends to decrease by almost 1. So more players to start with wouldn't always make the games more complex. The complexity reaches the lowest when the required minimum players is 4. From 4 minimum players to 10 players, the overall average complexity of games tends to increase by more than 0.5. Also, the games started with 0 player are the most complex ones for players, and the games started with 4 players would be relatively easy than others. Therefore, the games with too few or too many minimum players required can be more complex for players to some extent.
+
+### Complexity and Popularity of Category
+
+The other possible element that may affect whether players think a game is complex or not would be categories of board games.
+To compare the popularity of different categories and their corresponding average complexity, I deliberately pick two most popular categories: Card Game and War Game, and two least popular categories: Korean War and Fan Expansion. ("popularity" here means how many board games from 1950 to now are included in a certain category.)
+
+Here is my visualization.
+
+```{r, fig.cap = "Figure 5: Boxplots of the average complexity of the board games from each of the two most popular game categories and two least popular categories. Each boxplot displays the minimum, first quartile, median, third quartile, and maximum average complexity score within the given category.", echo = FALSE}
+# Split the category variable and make a new data set.
+new_data <- cSplit(data_set, "category", direction = "long")
+# Find two most popular categories and two least popular categories
+# using count function.
+count_category <- count(new_data, category, sort = TRUE)
+# Filter the new data set to only include the four categories I chose.
+filter(new_data, 
+       category == "Card Game" | category == "Korean War" 
+       | category == "Wargame" | category == "Fan Expansion") %>%
+  # Generate boxplots of the average complexity of the board games from each of 
+  # the two most popular game categories and two least popular categories.
+  ggplot(aes(x = category, y= average_complexity)) +
+  geom_boxplot(fill = "lightblue") +
+  theme_bw() +
+  # Change plot's title, x-axis and y-axis titles.
+  labs(title = "Average Complexity of Board Games in Four Categories",
+       x = "Category", y = "Average Complexity")
+```
+
+As the most popular board game category, most board games in Card Game category have the relatively lowest average rated complexity in these four categories overall. However, Fan Expansion as the least popular category has the second lowest average complexity overall, which is lower than the complexity of War Game, the second most popular category. And Korean War, the second least popular game, has the overall highest complexity in these four categories. Therefore, I found that there is no apparent correlation between the popularity of a board game category and how complex it is for players to play. So a low or high complexity is not the key point to make a kind of board games popular.
+
+### Complexity and Playing Time
+
+The last one possible element I was thinking about would be the amount of playing time needed for a board game. I divided all board games into two types by their amount of playing time: one type is the board games with less than or equal to 120 minutes playing time, and the other is the board games with more than 120 minutes playing time.
+
+Here is my boxplots of the average complexity of the board games by these two types.
+
+```{r, echo = FALSE, fig.cap = "Figure 6: Boxplots of the average complexity of the board games divided by the playing time less than or equal to 120 minutes and the playing time longer than 120 minutes. Each boxplot displays the minimum, first quartile, median, third quartile, and maximum average complexity score within the given category of playing time."}
+data_set %>%
+  # Make a new variable to show my division of board games by playing time.
+  mutate(categorize_time = ifelse(playingtime > 120, "playing_time > 120",
+                                  "playing_time <= 120")) %>%
+  # Generate boxplots of the average complexity of the board games divided by 
+  # the playing time.
+  ggplot(aes(x = categorize_time, y= average_complexity)) +
+  geom_boxplot(fill = "lightblue") +
+  theme_bw() +
+  # Change plot's title, x-axis and y-axis titles.
+  labs(title = "Average Complexity of Board Games by Playing Time",
+       x = "Playing time (in minute)", y = "Average Complexity")
+```
+
+In this visualization, I found that the median complexity of the board games with playing time less than or equal to 120 minutes is about 2. And for the board games with playing time longer than 120 minutes, the median average complexity is above 3, which is much higher. Also, the third quartile complexity score of the games with less than or equal to 120 minutes' playing time is below the first quartile complexity score of the board games with playing time longer than 120 minutes. Therefore, generally, players tend to rate most of the board games with playing time longer than 120 minutes as more complex than the board games with playing time less than 120 minutes. Therefore, it is possible that longer playing time required makes a board game become complex for players.
+
+## Summary
+In this project, I focused on analyzing the rated complexity scores of board games by players and looking for the possible relationship between the average complexity of board games and the other elements of board games. I got the following results.
+
+Most board games from 1950 to now are having medium or lower complexity and not so difficult for most people to play. Then the board games before 1970 have relatively low complexity, and from 1970 to now, the average complexity doesn't change much. It is kind of surprising that players may like and expect some more complex games, and that the games with too few or too many minimum players needed can be more complex for players to some extent. The complexity of a board game category doesn't play an important role in its popularity, but players tend to rate the board games with longer playing time as more complex.  
+
+## Code Appendix
+```{r, eval = FALSE}
+# Load packages
+library(tidyverse)
+library(splitstackshape)
+# Read the data file in Data subfolder.
+data_set <- read_csv("./Data/board_game_raw.csv") %>%
+  # Restrict the data set to only include the games with at least 25 ratings,
+  # published in 1950 or later, and average complexity larger than 0.
+  filter(yearpublished >= 1950, users_rated >= 25, average_complexity >0)
+# Plot 1: Generate a histogram of average complexity of the games
+ggplot(data = data_set, aes(x = average_complexity)) +
+  # Adjust the histogram's bin width and color.
+  geom_histogram(binwidth = 0.2, color = "black", fill = "lightblue") +
+  theme_bw() +
+  # Change plot's title, x-axis and y-axis titles.
+  labs(title = "Average Complexity of Board Games (1950-now)", 
+       x = "Average Complexity", y = "Count")
+# Plot 2: Generate a scatterplot of games’ average complexity by the year of 
+# publication with a fitting curve.
+ggplot(data = data_set, aes(x = yearpublished, y = average_complexity)) +
+  geom_point(size = 0.75) +
+  # Generate a fitting curve.
+  geom_smooth() +
+  theme_bw() +
+  # Change plot's title, x-axis and y-axis titles.
+  labs(title = "Average Complexity for Games by Year of Publication", 
+       x = "Year of Publication", y = "Average Complexity") +
+  # Adjust x-axis label.
+  scale_x_continuous(breaks = seq(1950, 2020, 10))
+# Plot 3: Generate a scatterplot of games’ average ratings by their average 
+# complexity with a fitting curve.
+ggplot(data = data_set, aes(x = average_complexity, y = average_rating)) +
+  geom_point(size = 0.5) +
+  # Generate a fitting curve
+  geom_smooth() +
+  theme_bw() +
+  # Change plot's title, x-axis and y-axis titles.
+  labs(title = "Average User Ratings by Average Complexity", 
+       x = "Average Complexity", y = "Average Rating")
+# Make a new variable that converts the numeric variable minplayers to 
+# character.
+sum_data <- mutate(data_set, min_players = as.character(minplayers)) %>%
+  # Group the data set by new variable min_players.
+  group_by(min_players) %>%
+  # Calculate the mean of average complexity of the games with different
+  # minimum players required.
+  summarize(mean_complexity = mean(average_complexity))
+# Convert the variable min_players back to be numeric.
+sum_data$min_players <- as.numeric(sum_data$min_players)
+  # Plot 4: Generate a line plot of games’ average complexity by number of 
+  #minimum players.
+  ggplot(data = sum_data, aes(x = min_players, y = mean_complexity)) +
+  geom_line(size = 0.75) +
+  geom_point() +
+  theme_bw() +
+  # Set the y-axis to be 0 to 3.
+  ylim(0,3) +
+  # Change plot's title, x-axis and y-axis titles.
+  labs(title = "Average Complexity of Board Games by Number of Minimum Players", 
+       x = "Number of Minplayers", y = "Average Complexity") +
+  # Adjust the title of the plot.
+  theme(plot.title = element_text(size = 11, face = "bold")) +
+  # Adjust the scale of x-axis.
+  scale_x_continuous(breaks = seq(0, 10, 1))
+# Split the category variable and make a new data set.
+new_data <- cSplit(data_set, "category", direction = "long")
+# Find two most popular categories and two least popular categories
+# using count function.
+count_category <- count(new_data, category, sort = TRUE)
+# Filter the new data set to only include the four categories I chose.
+filter(new_data, 
+       category == "Card Game" | category == "Korean War" 
+       | category == "Wargame" | category == "Fan Expansion") %>%
+  # Plot 5: Generate boxplots of the average complexity of the board games from 
+  # each of the two most popular game categories and two least popular    
+  # categories.
+  ggplot(aes(x = category, y= average_complexity)) +
+  geom_boxplot(fill = "lightblue") +
+  theme_bw() +
+  # Change plot's title, x-axis and y-axis titles.
+  labs(title = "Average Complexity of Board Games in Four Categories",
+       x = "Category", y = "Average Complexity")
+data_set %>%
+  # Make a new variable to show my division of board games by playing time.
+  mutate(categorize_time = ifelse(playingtime > 120, "playing_time > 120",
+                                  "playing_time <= 120")) %>%
+  # Plot 6: Generate boxplots of the average complexity of the board games 
+  # divided by the playing time.
+  ggplot(aes(x = categorize_time, y= average_complexity)) +
+  geom_boxplot(fill = "lightblue") +
+  theme_bw() +
+  # Change plot's title, x-axis and y-axis titles.
+  labs(title = "Average Complexity of Board Games by Playing Time",
+       x = "Playing time (in minute)", y = "Average Complexity")
+```
